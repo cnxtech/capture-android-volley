@@ -26,7 +26,6 @@ import com.android.volley.RequestQueue;
 import com.android.volley.Response.ErrorListener;
 import com.android.volley.Response.Listener;
 import com.android.volley.VolleyError;
-import com.android.volley.toolbox.ImageRequest;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -168,7 +167,11 @@ public class ImageLoader {
      * @param defaultImage Optional default image to return until the actual image is loaded.
      */
     public ImageContainer get(String requestUrl, final ImageListener listener) {
-        return get(requestUrl, listener, 0, 0);
+        return get(requestUrl, listener, 0, 0, null);
+    }
+
+    public ImageContainer get(String requestUrl, final ImageListener listener, BitmapPostProcessingTask bitmapPostProcessingTask) {
+        return get(requestUrl, listener, 0, 0, bitmapPostProcessingTask);
     }
 
     /**
@@ -184,7 +187,7 @@ public class ImageLoader {
      *     the currently available image (default if remote is not loaded).
      */
     public ImageContainer get(String requestUrl, ImageListener imageListener,
-            int maxWidth, int maxHeight) {
+            int maxWidth, int maxHeight, BitmapPostProcessingTask bitmapPostProcessingTask) {
         // only fulfill requests that were initiated from the main thread.
         throwIfNotOnMainThread();
 
@@ -228,7 +231,8 @@ public class ImageLoader {
                 public void onErrorResponse(VolleyError error) {
                     onGetImageError(cacheKey, error);
                 }
-            });
+            }, bitmapPostProcessingTask
+            );
 
         mRequestQueue.add(newRequest);
         mInFlightRequests.put(cacheKey,

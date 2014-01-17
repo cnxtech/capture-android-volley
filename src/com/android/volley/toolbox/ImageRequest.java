@@ -45,6 +45,7 @@ public class ImageRequest extends Request<Bitmap> {
     private final Config mDecodeConfig;
     private final int mMaxWidth;
     private final int mMaxHeight;
+    private final BitmapPostProcessingTask bitmapPostProcessingTask;
 
     /** Decoding lock so that we don't decode more than one image at a time (to avoid OOM's) */
     private static final Object sDecodeLock = new Object();
@@ -67,7 +68,7 @@ public class ImageRequest extends Request<Bitmap> {
      * @param errorListener Error listener, or null to ignore errors
      */
     public ImageRequest(String url, Response.Listener<Bitmap> listener, int maxWidth, int maxHeight,
-            Config decodeConfig, Response.ErrorListener errorListener) {
+            Config decodeConfig, Response.ErrorListener errorListener, BitmapPostProcessingTask bitmapPostProcessingTask) {
         super(Method.GET, url, errorListener);
         setRetryPolicy(
                 new DefaultRetryPolicy(IMAGE_TIMEOUT_MS, IMAGE_MAX_RETRIES, IMAGE_BACKOFF_MULT));
@@ -75,6 +76,7 @@ public class ImageRequest extends Request<Bitmap> {
         mDecodeConfig = decodeConfig;
         mMaxWidth = maxWidth;
         mMaxHeight = maxHeight;
+        this.bitmapPostProcessingTask = bitmapPostProcessingTask;
     }
 
     @Override
@@ -173,7 +175,9 @@ public class ImageRequest extends Request<Bitmap> {
                 bitmap = tempBitmap;
             }
         }
-
+        if (bitmapPostProcessingTask != null && bitmap != null){
+            bitmap = bitmapPostProcessingTask.execute(bitmap);
+        }
         if (bitmap == null) {
             return Response.error(new ParseError(response));
         } else {
