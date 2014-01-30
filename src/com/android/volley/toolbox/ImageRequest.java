@@ -16,29 +16,32 @@
 
 package com.android.volley.toolbox;
 
-import com.android.volley.DefaultRetryPolicy;
-import com.android.volley.NetworkResponse;
-import com.android.volley.ParseError;
-import com.android.volley.Request;
-import com.android.volley.Response;
-import com.android.volley.VolleyLog;
+import com.android.volley.*;
 
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
 import android.graphics.BitmapFactory;
+import com.android.volley.utils.BitmapUtils;
+import com.android.volley.utils.FileUtils;
 
 /**
  * A canned request for getting an image at a given URL and calling
  * back with a decoded Bitmap.
  */
 public class ImageRequest extends Request<Bitmap> {
-    /** Socket timeout in milliseconds for image requests */
+    /**
+     * Socket timeout in milliseconds for image requests
+     */
     private static final int IMAGE_TIMEOUT_MS = 1000;
 
-    /** Default number of retries for image requests */
+    /**
+     * Default number of retries for image requests
+     */
     private static final int IMAGE_MAX_RETRIES = 2;
 
-    /** Default backoff multiplier for image requests */
+    /**
+     * Default backoff multiplier for image requests
+     */
     private static final float IMAGE_BACKOFF_MULT = 2f;
 
     private final Response.Listener<Bitmap> mListener;
@@ -47,8 +50,16 @@ public class ImageRequest extends Request<Bitmap> {
     private final int mMaxHeight;
     private final BitmapPostProcessingTask bitmapPostProcessingTask;
 
-    /** Decoding lock so that we don't decode more than one image at a time (to avoid OOM's) */
+    /**
+     * disk cache to persist bitmaps
+     */
+    private final DiskCache diskBitmapCache;
+
+    /**
+     * Decoding lock so that we don't decode more than one image at a time (to avoid OOM's)
+     */
     private static final Object sDecodeLock = new Object();
+
 
     /**
      * Creates a new image request, decoding to a maximum specified width and
@@ -59,44 +70,47 @@ public class ImageRequest extends Request<Bitmap> {
      * be fit in the rectangle of dimensions width x height while keeping its
      * aspect ratio.
      *
-     * @param url URL of the image
-     * @param listener Listener to receive the decoded bitmap
-     * @param maxWidth Maximum width to decode this bitmap to, or zero for none
-     * @param maxHeight Maximum height to decode this bitmap to, or zero for
-     *            none
-     * @param decodeConfig Format to decode the bitmap to
+     * @param url           URL of the image
+     * @param listener      Listener to receive the decoded bitmap
+     * @param maxWidth      Maximum width to decode this bitmap to, or zero for none
+     * @param maxHeight     Maximum height to decode this bitmap to, or zero for
+     *                      none
+     * @param decodeConfig  Format to decode the bitmap to
      * @param errorListener Error listener, or null to ignore errors
      */
     public ImageRequest(String url, Response.Listener<Bitmap> listener, int maxWidth, int maxHeight,
-            Config decodeConfig, Response.ErrorListener errorListener, BitmapPostProcessingTask bitmapPostProcessingTask) {
+                        Config decodeConfig, Response.ErrorListener errorListener, BitmapPostProcessingTask bitmapPostProcessingTask, DiskCache diskBitmapCache) {
         super(Method.GET, url, errorListener);
         setRetryPolicy(
-                new DefaultRetryPolicy(IMAGE_TIMEOUT_MS, IMAGE_MAX_RETRIES, IMAGE_BACKOFF_MULT));
+            new DefaultRetryPolicy(IMAGE_TIMEOUT_MS, IMAGE_MAX_RETRIES, IMAGE_BACKOFF_MULT));
         mListener = listener;
         mDecodeConfig = decodeConfig;
         mMaxWidth = maxWidth;
         mMaxHeight = maxHeight;
         this.bitmapPostProcessingTask = bitmapPostProcessingTask;
+        this.diskBitmapCache = diskBitmapCache;
     }
+
 
     @Override
     public Priority getPriority() {
         return Priority.LOW;
     }
 
+
     /**
      * Scales one side of a rectangle to fit aspect ratio.
      *
-     * @param maxPrimary Maximum size of the primary dimension (i.e. width for
-     *        max width), or zero to maintain aspect ratio with secondary
-     *        dimension
-     * @param maxSecondary Maximum size of the secondary dimension, or zero to
-     *        maintain aspect ratio with primary dimension
-     * @param actualPrimary Actual size of the primary dimension
+     * @param maxPrimary      Maximum size of the primary dimension (i.e. width for
+     *                        max width), or zero to maintain aspect ratio with secondary
+     *                        dimension
+     * @param maxSecondary    Maximum size of the secondary dimension, or zero to
+     *                        maintain aspect ratio with primary dimension
+     * @param actualPrimary   Actual size of the primary dimension
      * @param actualSecondary Actual size of the secondary dimension
      */
     private static int getResizedDimension(int maxPrimary, int maxSecondary, int actualPrimary,
-            int actualSecondary) {
+                                           int actualSecondary) {
         // If no dominant value at all, just return the actual.
         if (maxPrimary == 0 && maxSecondary == 0) {
             return actualPrimary;
@@ -120,8 +134,31 @@ public class ImageRequest extends Request<Bitmap> {
         return resized;
     }
 
+
+    /**
+     * if url represents local file, we handle that here
+     */
+    public Response<Bitmap> handleLocalUri() {
+        String filePath = FileUtils.getFilePath(getUrl());
+
+        String mimeType = FileUtils.getMimeTypeForFilePath(filePath);
+        byte[] bytes = new byte[0];
+        if (mimeType.startsWith("video")) {
+            synchronized (sDecodeLock) {
+                bytes = BitmapUtils.createThumbnailForVideoAndGetBytes(filePath);
+            }
+
+        } else if (mimeType.startsWith("image")) {
+
+            bytes = FileUtils.loadFileAsBytes(filePath);   //trying to load bytes for image
+        }
+
+        return parseNetworkResponse(new NetworkResponse(bytes));
+    }
+
+
     @Override
-    protected Response<Bitmap> parseNetworkResponse(NetworkResponse response) {
+    public Response<Bitmap> parseNetworkResponse(NetworkResponse response) {
         // Serialize all decode on a global lock to reduce concurrent heap usage.
         synchronized (sDecodeLock) {
             try {
@@ -133,11 +170,19 @@ public class ImageRequest extends Request<Bitmap> {
         }
     }
 
+
     /**
      * The real guts of parseNetworkResponse. Broken out for readability.
      */
     private Response<Bitmap> doParse(NetworkResponse response) {
         byte[] data = response.data;
+
+        if (data == null || data.length == 0) {
+            return Response.error(new ParseError(response));
+        }
+
+        diskBitmapCache.putIfNotExists(getUrl(), data); //persist bitmap on storage if needed
+
         BitmapFactory.Options decodeOptions = new BitmapFactory.Options();
         Bitmap bitmap = null;
         if (mMaxWidth == 0 && mMaxHeight == 0) {
@@ -152,9 +197,9 @@ public class ImageRequest extends Request<Bitmap> {
 
             // Then compute the dimensions we would ideally like to decode to.
             int desiredWidth = getResizedDimension(mMaxWidth, mMaxHeight,
-                    actualWidth, actualHeight);
+                actualWidth, actualHeight);
             int desiredHeight = getResizedDimension(mMaxHeight, mMaxWidth,
-                    actualHeight, actualWidth);
+                actualHeight, actualWidth);
 
             // Decode to the nearest power of two scaling factor.
             decodeOptions.inJustDecodeBounds = false;
@@ -167,15 +212,15 @@ public class ImageRequest extends Request<Bitmap> {
 
             // If necessary, scale down to the maximal acceptable size.
             if (tempBitmap != null && (tempBitmap.getWidth() > desiredWidth ||
-                    tempBitmap.getHeight() > desiredHeight)) {
+                tempBitmap.getHeight() > desiredHeight)) {
                 bitmap = Bitmap.createScaledBitmap(tempBitmap,
-                        desiredWidth, desiredHeight, true);
+                    desiredWidth, desiredHeight, true);
                 tempBitmap.recycle();
             } else {
                 bitmap = tempBitmap;
             }
         }
-        if (bitmapPostProcessingTask != null && bitmap != null){
+        if (bitmapPostProcessingTask != null && bitmap != null) {
             bitmap = bitmapPostProcessingTask.execute(bitmap);
         }
         if (bitmap == null) {
@@ -185,23 +230,25 @@ public class ImageRequest extends Request<Bitmap> {
         }
     }
 
+
     @Override
     protected void deliverResponse(Bitmap response) {
         mListener.onResponse(response);
     }
 
+
     /**
      * Returns the largest power-of-two divisor for use in downscaling a bitmap
      * that will not result in the scaling past the desired dimensions.
      *
-     * @param actualWidth Actual width of the bitmap
-     * @param actualHeight Actual height of the bitmap
-     * @param desiredWidth Desired width of the bitmap
+     * @param actualWidth   Actual width of the bitmap
+     * @param actualHeight  Actual height of the bitmap
+     * @param desiredWidth  Desired width of the bitmap
      * @param desiredHeight Desired height of the bitmap
      */
     // Visible for testing.
     static int findBestSampleSize(
-            int actualWidth, int actualHeight, int desiredWidth, int desiredHeight) {
+        int actualWidth, int actualHeight, int desiredWidth, int desiredHeight) {
         double wr = (double) actualWidth / desiredWidth;
         double hr = (double) actualHeight / desiredHeight;
         double ratio = Math.min(wr, hr);

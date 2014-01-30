@@ -75,6 +75,9 @@ public class RequestQueue {
     /** Cache interface for retrieving and storing respones. */
     private final Cache mCache;
 
+    /** Cache interface for retrieving and storing bitmaps. */
+    private final DiskCache diskBitmapCache;
+
     /** Network interface for performing requests. */
     private final Network mNetwork;
 
@@ -95,12 +98,13 @@ public class RequestQueue {
      * @param threadPoolSize Number of network dispatcher threads to create
      * @param delivery A ResponseDelivery interface for posting responses and errors
      */
-    public RequestQueue(Cache cache, Network network, int threadPoolSize,
+    public RequestQueue(Cache cache, DiskCache diskBitmapCache, Network network, int threadPoolSize,
             ResponseDelivery delivery) {
         mCache = cache;
         mNetwork = network;
         mDispatchers = new NetworkDispatcher[threadPoolSize];
         mDelivery = delivery;
+        this.diskBitmapCache = diskBitmapCache;
     }
 
     /**
@@ -110,8 +114,8 @@ public class RequestQueue {
      * @param network A Network interface for performing HTTP requests
      * @param threadPoolSize Number of network dispatcher threads to create
      */
-    public RequestQueue(Cache cache, Network network, int threadPoolSize) {
-        this(cache, network, threadPoolSize,
+    public RequestQueue(Cache cache, DiskCache diskBitmapCache, Network network, int threadPoolSize) {
+        this(cache, diskBitmapCache, network, threadPoolSize,
                 new ExecutorDelivery(new Handler(Looper.getMainLooper())));
     }
 
@@ -121,8 +125,8 @@ public class RequestQueue {
      * @param cache A Cache to use for persisting responses to disk
      * @param network A Network interface for performing HTTP requests
      */
-    public RequestQueue(Cache cache, Network network) {
-        this(cache, network, DEFAULT_NETWORK_THREAD_POOL_SIZE);
+    public RequestQueue(Cache cache, DiskCache diskBitmapCache, Network network) {
+        this(cache, diskBitmapCache, network, DEFAULT_NETWORK_THREAD_POOL_SIZE);
     }
 
     /**
@@ -131,7 +135,7 @@ public class RequestQueue {
     public void start() {
         stop();  // Make sure any currently running dispatchers are stopped.
         // Create the cache dispatcher and start it.
-        mCacheDispatcher = new CacheDispatcher(mCacheQueue, mNetworkQueue, mCache, mDelivery);
+        mCacheDispatcher = new CacheDispatcher(mCacheQueue, mNetworkQueue, mCache, diskBitmapCache, mDelivery);
         mCacheDispatcher.start();
 
         // Create network dispatchers (and corresponding threads) up to the pool size.
