@@ -141,6 +141,8 @@ public class BasicNetwork implements Network {
                                 statusCode == HttpStatus.SC_FORBIDDEN) {
                             attemptRetryOnException("auth",
                                     request, new AuthFailureError(networkResponse));  //TODO decide what to do with other codes
+                        } else {
+                            throw new ServerError(networkResponse);
                         }
                     } else {
                         throw new ServerError(networkResponse);

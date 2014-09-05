@@ -1,12 +1,16 @@
 apply plugin: 'android-library'
 
+dependencies {
+    compile 'commons-io:commons-io:2.4'
+}
+
 android {
-    compileSdkVersion 17
-    buildToolsVersion = 17
+    compileSdkVersion 20
+    buildToolsVersion "20.0.0"
 
     sourceSets {
         defaultConfig {
-            testPackageName 'com.android.volley.tests'
+            testApplicationId 'com.android.volley.tests'
         }
 
         main {

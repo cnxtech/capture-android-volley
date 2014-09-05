@@ -21,12 +21,9 @@ import android.os.Handler;
 import android.os.Looper;
 import android.widget.ImageView;
 
-import com.android.volley.Request;
-import com.android.volley.RequestQueue;
+import com.android.volley.*;
 import com.android.volley.Response.ErrorListener;
 import com.android.volley.Response.Listener;
-import com.android.volley.VolleyError;
-import com.android.volley.toolbox.ImageRequest;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -49,6 +46,9 @@ public class ImageLoader {
 
     /** The cache implementation to be used as an L1 cache before calling into volley. */
     private final ImageCache mCache;
+
+    /** disk cache to store bitmaps*/
+    private final DiskCache diskCache;
 
     /**
      * HashMap of Cache keys -> BatchedImageRequest used to track in-flight requests so
@@ -82,16 +82,17 @@ public class ImageLoader {
      * @param queue The RequestQueue to use for making image requests.
      * @param imageCache The cache to use as an L1 cache.
      */
-    public ImageLoader(RequestQueue queue, ImageCache imageCache) {
+    public ImageLoader(RequestQueue queue, ImageCache imageCache, DiskCache diskCache) {
         mRequestQueue = queue;
         mCache = imageCache;
+        this.diskCache = diskCache;
     }
 
     /**
      * The default implementation of ImageListener which handles basic functionality
      * of showing a default image until the network response is received, at which point
      * it will switch to either the actual image or the error image.
-     * @param imageView The imageView that the listener is associated with.
+     * @param view The imageView that the listener is associated with.
      * @param defaultImageResId Default image resource ID to use, or 0 if it doesn't exist.
      * @param errorImageResId Error image resource ID to use, or 0 if it doesn't exist.
      */
@@ -165,10 +166,13 @@ public class ImageLoader {
      * request is fulfilled.
      *
      * @param requestUrl The URL of the image to be loaded.
-     * @param defaultImage Optional default image to return until the actual image is loaded.
      */
     public ImageContainer get(String requestUrl, final ImageListener listener) {
-        return get(requestUrl, listener, 0, 0);
+        return get(requestUrl, listener, 0, 0, null);
+    }
+
+    public ImageContainer get(String requestUrl, final ImageListener listener, BitmapPostProcessingTask bitmapPostProcessingTask) {
+        return get(requestUrl, listener, 0, 0, bitmapPostProcessingTask);
     }
 
     /**
@@ -184,7 +188,7 @@ public class ImageLoader {
      *     the currently available image (default if remote is not loaded).
      */
     public ImageContainer get(String requestUrl, ImageListener imageListener,
-            int maxWidth, int maxHeight) {
+            int maxWidth, int maxHeight, BitmapPostProcessingTask bitmapPostProcessingTask) {
         // only fulfill requests that were initiated from the main thread.
         throwIfNotOnMainThread();
 
@@ -228,7 +232,8 @@ public class ImageLoader {
                 public void onErrorResponse(VolleyError error) {
                     onGetImageError(cacheKey, error);
                 }
-            });
+            }, bitmapPostProcessingTask, diskCache
+            );
 
         mRequestQueue.add(newRequest);
         mInFlightRequests.put(cacheKey,
@@ -426,7 +431,6 @@ public class ImageLoader {
      * Starts the runnable for batched delivery of responses if it is not already started.
      * @param cacheKey The cacheKey of the response being delivered.
      * @param request The BatchedImageRequest to be delivered.
-     * @param error The volley error associated with the request (if applicable).
      */
     private void batchResponse(String cacheKey, BatchedImageRequest request) {
         mBatchedResponses.put(cacheKey, request);
