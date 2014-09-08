@@ -24,6 +24,7 @@ import android.widget.ImageView;
 import com.android.volley.*;
 import com.android.volley.Response.ErrorListener;
 import com.android.volley.Response.Listener;
+import com.android.volley.VolleyError;
 
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -220,25 +221,28 @@ public class ImageLoader {
 
         // The request is not already in flight. Send the new request to the network and
         // track it.
-        Request<?> newRequest =
-            new ImageRequest(requestUrl, new Listener<Bitmap>() {
-                @Override
-                public void onResponse(Bitmap response) {
-                    onGetImageSuccess(cacheKey, response);
-                }
-            }, maxWidth, maxHeight,
-            Config.RGB_565, new ErrorListener() {
-                @Override
-                public void onErrorResponse(VolleyError error) {
-                    onGetImageError(cacheKey, error);
-                }
-            }, bitmapPostProcessingTask, diskCache
-            );
+        Request<Bitmap> newRequest = makeImageRequest(requestUrl, maxWidth, maxHeight, cacheKey, bitmapPostProcessingTask);
 
         mRequestQueue.add(newRequest);
         mInFlightRequests.put(cacheKey,
                 new BatchedImageRequest(newRequest, imageContainer));
         return imageContainer;
+    }
+
+    protected Request<Bitmap> makeImageRequest(String requestUrl, int maxWidth, int maxHeight, final String cacheKey, BitmapPostProcessingTask bitmapPostProcessingTask) {
+        return new ImageRequest(requestUrl, new Listener<Bitmap>() {
+            @Override
+            public void onResponse(Bitmap response) {
+                onGetImageSuccess(cacheKey, response);
+            }
+        }, maxWidth, maxHeight,
+        Config.RGB_565, new ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                onGetImageError(cacheKey, error);
+            }
+        }, bitmapPostProcessingTask, diskCache
+        );
     }
 
     /**
@@ -255,7 +259,7 @@ public class ImageLoader {
      * @param cacheKey The cache key that is associated with the image request.
      * @param response The bitmap that was returned from the network.
      */
-    private void onGetImageSuccess(String cacheKey, Bitmap response) {
+    protected void onGetImageSuccess(String cacheKey, Bitmap response) {
         // cache the image that was fetched.
         mCache.putBitmap(cacheKey, response);
 
@@ -275,15 +279,15 @@ public class ImageLoader {
      * Handler for when an image failed to load.
      * @param cacheKey The cache key that is associated with the image request.
      */
-    private void onGetImageError(String cacheKey, VolleyError error) {
+    protected void onGetImageError(String cacheKey, VolleyError error) {
         // Notify the requesters that something failed via a null result.
         // Remove this request from the list of in-flight requests.
         BatchedImageRequest request = mInFlightRequests.remove(cacheKey);
 
-        // Set the error for this request
-        request.setError(error);
-
         if (request != null) {
+            // Set the error for this request
+            request.setError(error);
+
             // Send the batched response
             batchResponse(cacheKey, request);
         }
