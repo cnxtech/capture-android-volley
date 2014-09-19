@@ -1,3 +1,9 @@
+def versionMajor = 1
+def versionMinor = 0
+def versionPatch = 0
+def versionBuild = 1 // bump for dogfood builds, public betas, etc.
+
+
 task wrapper(type: Wrapper) {
     gradleVersion = '2.1'
 }
@@ -29,8 +35,8 @@ android {
     defaultConfig {
         targetSdkVersion 20
         minSdkVersion 8
-        versionCode 1
-        versionName "1.0"
+        versionCode versionMajor * 10000 + versionMinor * 1000 + versionPatch * 100 + versionBuild
+        versionName "${versionMajor}.${versionMinor}.${versionPatch}"
     }
 
     buildTypes {
@@ -58,5 +64,17 @@ android {
 
         instrumentTest.setRoot('tests')
         instrumentTest.java.srcDirs = ['tests/src']
+    }
+
+    android.libraryVariants.all { variant ->
+        def name = variant.buildType.name
+        if (name.equals(com.android.builder.core.BuilderConstants.DEBUG)) {
+            return; // Skip debug builds.
+        }
+        def task = project.tasks.create "jar${name.capitalize()}", Jar
+        task.dependsOn variant.javaCompile
+        task.from variant.javaCompile.destinationDir
+        task.archiveName = task.archiveName.replace(".jar", "_" + defaultConfig.versionName + "_.jar")
+        artifacts.add('archives', task);
     }
 }
