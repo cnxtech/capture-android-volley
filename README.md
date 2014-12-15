@@ -2,7 +2,11 @@ android-volley
 ==============
 
 
-Original is here https://android.googlesource.com/platform/frameworks/volley. Modified stuff inside cmdevelop branch.
+Forked from https://android.googlesource.com/platform/frameworks/volley. 
+To sync:
 ```sh
-git remote add original https://android.googlesource.com/platform/frameworks/volley
+git checkout master
+git remote add upstream https://android.googlesource.com/platform/frameworks/volley
+git fetch upstream
+git merge --no-ff upstream/master -m "Sync with upstream."
 ```
