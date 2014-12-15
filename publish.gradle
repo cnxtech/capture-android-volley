@@ -1,0 +1,58 @@
+apply plugin: 'maven-publish'
+
+
+publishing {
+
+    repositories {
+        maven {
+            if (project.hasProperty('publishDestination')) {
+                if (project.publishDestination.equals("snapshots")) {
+                    url = project.ext.macminiMavenSnapshotsUrl
+                } else if (project.publishDestination.equals("internal"))
+                    url = project.ext.macminiMavenInternalUrl
+            } else {
+                println("\n#### Publish destination is not defined, publish will not work. Use -PpublishDestination=internal or -PpublishDestination=snapshots to publish to internal or snapshots repository.\n");
+            }
+
+            //Don't forget to add sandboxSign.properties to the right location
+            if (project.hasProperty('maven.properties')) {
+
+                String filePath = System.properties['user.home'] + project.property('maven.properties');
+
+                if (new File(filePath).exists()) {
+                    Properties props = new Properties()
+                    props.load(new FileInputStream(file(filePath)))
+
+                    credentials {
+                        username props['username']
+                        password props['password']
+                    }
+
+                } else {
+                    println '\n#### maven.properties does not exist.\n'
+                }
+            } else {
+                println '\n#### maven.properties is missing.\n'
+            }
+        }
+    }
+
+    publications {
+        maven(MavenPublication) {
+
+            groupId 'com.capture'
+            artifactId 'volley'
+
+            String versionName = project.ext.versionNameGlobal + "-" + project.ext.versionCodeGlobal
+            if (project.hasProperty('publishDestination') && project.publishDestination.equals("snapshots")) {
+                versionName += "-SNAPSHOT"
+            }
+
+            version versionName
+
+            artifact('build/libs/' + project.ext.jarArtifactName) {
+                extension = 'jar'
+            }
+        }
+    }
+}

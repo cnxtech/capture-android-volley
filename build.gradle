@@ -1,10 +1,20 @@
-def versionMajor = 1
+def versionMajor = 0
 def versionMinor = 0
-def versionPatch = 0
+def versionPatch = 2
 def versionBuild = 1 // bump for dogfood builds, public betas, etc.
+ext.gitHash = "git rev-parse --short=10 HEAD".execute().text.trim()
+ext.versionCodeGlobal = versionMajor * 10000 + versionMinor * 1000 + versionPatch * 100 + versionBuild
+ext.versionNameGlobal = "${versionMajor}.${versionMinor}.${versionPatch}"
+ext.jarArtifactName = "volley_" + versionNameGlobal + "_" + versionCodeGlobal + "_" + gitHash + ".jar"
+ext.macminiMavenInternalUrl = 'http://macmini:8081/repository/internal/'
+ext.macminiMavenSnapshotsUrl = 'http://macmini:8081/repository/snapshots/'
+
 
 buildscript {
     repositories {
+        maven {
+            url = 'http://macmini:8081/repository/internal/'
+        }
         jcenter()
     }
     dependencies {
@@ -14,6 +24,12 @@ buildscript {
 
 allprojects {
     repositories {
+        maven {
+            url = project.ext.macminiMavenInternalUrl
+        }
+        maven {
+            url = project.ext.macminiMavenSnapshotsUrl
+        }
         jcenter()
     }
 }
@@ -25,19 +41,8 @@ dependencies {
 }
 
 android {
-    compileSdkVersion 20
-    buildToolsVersion "20.0.0"
-    defaultConfig {
-        targetSdkVersion 20
-        minSdkVersion 8
-        versionCode versionMajor * 10000 + versionMinor * 1000 + versionPatch * 100 + versionBuild
-        versionName "${versionMajor}.${versionMinor}.${versionPatch}"
-    }
-
-    buildTypes {
-        release {
-        }
-    }
+    compileSdkVersion 21
+    buildToolsVersion "21.1.2"
 
     android.libraryVariants.all { variant ->
         def name = variant.buildType.name
@@ -47,10 +52,12 @@ android {
         def task = project.tasks.create "jar${name.capitalize()}", Jar
         task.dependsOn variant.javaCompile
         task.from variant.javaCompile.destinationDir
-        task.archiveName = task.archiveName.replace(".jar", "_" + defaultConfig.versionName + "_.jar")
+        task.archiveName = jarArtifactName
         artifacts.add('archives', task);
     }
 }
 
+
 apply from: 'rules.gradle'
+apply from: 'publish.gradle'
 
