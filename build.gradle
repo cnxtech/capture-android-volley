@@ -39,26 +39,6 @@ android {
         }
     }
 
-    sourceSets {
-        defaultConfig {
-            testApplicationId 'com.android.volley.tests'
-        }
-
-        main {
-            assets.srcDirs = ['assets']
-            res.srcDirs = ['res']
-            aidl.srcDirs = ['src']
-            resources.srcDirs = ['src']
-            renderscript.srcDirs = ['src']
-            java.srcDirs = ['src']
-            manifest.srcFile 'AndroidManifest.xml'
-
-        }
-
-        instrumentTest.setRoot('tests')
-        instrumentTest.java.srcDirs = ['tests/src']
-    }
-
     android.libraryVariants.all { variant ->
         def name = variant.buildType.name
         if (name.equals(com.android.builder.core.BuilderConstants.DEBUG)) {
@@ -71,3 +51,6 @@ android {
         artifacts.add('archives', task);
     }
 }
+
+apply from: 'rules.gradle'
+
