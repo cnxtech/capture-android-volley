@@ -133,7 +133,6 @@ public abstract class Request<T> implements Comparable<Request<T>> {
         mUrl = url;
         mErrorListener = listener;
         setRetryPolicy(new DefaultRetryPolicy());
-
         mDefaultTrafficStatsTag = findDefaultTrafficStatsTag(url);
     }
 

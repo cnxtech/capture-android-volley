@@ -1,25 +1,63 @@
-// NOTE: The only changes that belong in this file are the definitions
-// of tool versions (gradle plugin, compile SDK, build tools), so that
-// Volley can be built via gradle as a standalone project.
-//
-// Any other changes to the build config belong in rules.gradle, which
-// is used by projects that depend on Volley but define their own
-// tools versions across all dependencies to ensure a consistent build.
+def versionMajor = 0
+def versionMinor = 0
+def versionPatch = 2
+def versionBuild = 1 // bump for dogfood builds, public betas, etc.
+ext.gitHash = "git rev-parse --short=10 HEAD".execute().text.trim()
+ext.versionCodeGlobal = versionMajor * 10000 + versionMinor * 1000 + versionPatch * 100 + versionBuild
+ext.versionNameGlobal = "${versionMajor}.${versionMinor}.${versionPatch}"
+ext.jarArtifactName = "volley_" + versionNameGlobal + "_" + versionCodeGlobal + "_" + gitHash + ".jar"
+ext.macminiMavenInternalUrl = 'http://macmini:8081/repository/internal/'
+ext.macminiMavenSnapshotsUrl = 'http://macmini:8081/repository/snapshots/'
+
 
 buildscript {
     repositories {
-        mavenCentral()
+        maven {
+            url = 'http://macmini:8081/repository/internal/'
+        }
+        jcenter()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:0.14.+'
+        classpath 'com.android.tools.build:gradle:1.0.0'
+    }
+}
+
+allprojects {
+    repositories {
+        maven {
+            url = project.ext.macminiMavenInternalUrl
+        }
+        maven {
+            url = project.ext.macminiMavenSnapshotsUrl
+        }
+        jcenter()
     }
 }
 
 apply plugin: 'com.android.library'
 
-android {
-    compileSdkVersion 19
-    buildToolsVersion = '21.1.0'
+dependencies {
+    compile 'commons-io:commons-io:2.4'
 }
 
+android {
+    compileSdkVersion 21
+    buildToolsVersion "21.1.2"
+
+    android.libraryVariants.all { variant ->
+        def name = variant.buildType.name
+        if (name.equals(com.android.builder.core.BuilderConstants.DEBUG)) {
+            return; // Skip debug builds.
+        }
+        def task = project.tasks.create "jar${name.capitalize()}", Jar
+        task.dependsOn variant.javaCompile
+        task.from variant.javaCompile.destinationDir
+        task.archiveName = jarArtifactName
+        artifacts.add('archives', task);
+    }
+}
+
+
 apply from: 'rules.gradle'
+apply from: 'publish.gradle'
+

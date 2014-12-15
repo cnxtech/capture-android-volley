@@ -3,6 +3,18 @@ gen
 .gradle
 build
 .settings
-target
-*.iml
-.idea
+
+local.properties
+
+# IDEA
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/libraries/
+
+# GRADLE
+.gradle
+build/
+
+# OSX files
+.DS_Store
+

@@ -17,12 +17,13 @@
 package com.android.volley;
 
 import android.os.Process;
+import com.android.volley.toolbox.ImageRequest;
 
 import java.util.concurrent.BlockingQueue;
 
 /**
  * Provides a thread for performing cache triage on a queue of requests.
- *
+ * <p/>
  * Requests added to the specified cache queue are resolved from cache.
  * Any deliverable response is posted back to the caller via a
  * {@link ResponseDelivery}.  Cache misses and responses that require
@@ -30,6 +31,8 @@ import java.util.concurrent.BlockingQueue;
  * by a {@link NetworkDispatcher}.
  */
 public class CacheDispatcher extends Thread {
+
+    private static final String TAG = CacheDispatcher.class.getSimpleName();
 
     private static final boolean DEBUG = VolleyLog.DEBUG;
 
@@ -39,32 +42,46 @@ public class CacheDispatcher extends Thread {
     /** The queue of requests going out to the network. */
     private final BlockingQueue<Request<?>> mNetworkQueue;
 
-    /** The cache to read from. */
+    /**
+     * The cache to read from.
+     */
     private final Cache mCache;
 
-    /** For posting responses. */
+    /**
+     * Disk bitmap cache to read ImageRequests
+     */
+    private final DiskCache diskBitmapCache;
+
+    /**
+     * For posting responses.
+     */
     private final ResponseDelivery mDelivery;
 
-    /** Used for telling us to die. */
+    /**
+     * Used for telling us to die.
+     */
     private volatile boolean mQuit = false;
+
 
     /**
      * Creates a new cache triage dispatcher thread.  You must call {@link #start()}
      * in order to begin processing.
      *
-     * @param cacheQueue Queue of incoming requests for triage
+     * @param cacheQueue   Queue of incoming requests for triage
      * @param networkQueue Queue to post requests that require network to
-     * @param cache Cache interface to use for resolution
-     * @param delivery Delivery interface to use for posting responses
+     * @param cache        Cache interface to use for resolution
+     * @param delivery     Delivery interface to use for posting responses
      */
     public CacheDispatcher(
             BlockingQueue<Request<?>> cacheQueue, BlockingQueue<Request<?>> networkQueue,
-            Cache cache, ResponseDelivery delivery) {
+            Cache cache, DiskCache diskBitmapCache, ResponseDelivery delivery) {
         mCacheQueue = cacheQueue;
         mNetworkQueue = networkQueue;
         mCache = cache;
         mDelivery = delivery;
+        this.diskBitmapCache = diskBitmapCache;
     }
+
 
     /**
      * Forces this dispatcher to quit immediately.  If any requests are still in
@@ -75,9 +92,10 @@ public class CacheDispatcher extends Thread {
         interrupt();
     }
 
+
     @Override
     public void run() {
-        if (DEBUG) VolleyLog.v("start new dispatcher");
+        if (DEBUG) { VolleyLog.v("start new dispatcher"); }
         Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
 
         // Make a blocking call to initialize the cache.
@@ -94,6 +112,28 @@ public class CacheDispatcher extends Thread {
                 if (request.isCanceled()) {
                     request.finish("cache-discard-canceled");
                     continue;
+                }
+
+                 /** special handling for an ImageRequest */
+                if (request instanceof ImageRequest) {
+                    android.util.Log.i("####", TAG + " got ImageRequest " + request.getUrl());   //TODO remove when testing is done
+                    //check image cache, return result if we have key there
+                    byte[] bytes = diskBitmapCache.getBytes(request.getUrl());
+
+                    if (bytes != null && bytes.length > 0) {
+                        Response<?> response = request.parseNetworkResponse(new NetworkResponse(bytes));
+                        mDelivery.postResponse(request, response);
+                        continue;
+                    }
+
+                    if (bytes == null || bytes.length == 0) {   //if we didn't get anything from cache
+                        if (request.getUrl().startsWith("file")) {  //let's check, may be this is local file
+
+                            Response<?> response = ((ImageRequest) request).handleLocalUri();
+                            mDelivery.postResponse(request, response);
+                            continue;
+                        }
+                    }
                 }
 
                 // Attempt to retrieve this item from cache.
@@ -116,7 +156,7 @@ public class CacheDispatcher extends Thread {
                 // We have a cache hit; parse its data for delivery back to the request.
                 request.addMarker("cache-hit");
                 Response<?> response = request.parseNetworkResponse(
-                        new NetworkResponse(entry.data, entry.responseHeaders));
+                    new NetworkResponse(entry.data, entry.responseHeaders));
                 request.addMarker("cache-hit-parsed");
 
                 if (!entry.refreshNeeded()) {

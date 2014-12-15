@@ -154,12 +154,15 @@ public class BasicNetwork implements Network {
                 if (responseContents != null) {
                     networkResponse = new NetworkResponse(statusCode, responseContents,
                             responseHeaders, false, SystemClock.elapsedRealtime() - requestStart);
-                    if (statusCode == HttpStatus.SC_UNAUTHORIZED ||
-                            statusCode == HttpStatus.SC_FORBIDDEN) {
-                        attemptRetryOnException("auth",
-                                request, new AuthFailureError(networkResponse));
+                    if (statusCode >= 400 && statusCode < 500 ){
+                        if (statusCode == HttpStatus.SC_UNAUTHORIZED ||
+                                statusCode == HttpStatus.SC_FORBIDDEN) {
+                            attemptRetryOnException("auth",
+                                    request, new AuthFailureError(networkResponse));  
+                        } else {
+                            throw new ServerError(networkResponse);
+                        }
                     } else {
-                        // TODO: Only throw ServerError for 5xx status codes.
                         throw new ServerError(networkResponse);
                     }
                 } else {

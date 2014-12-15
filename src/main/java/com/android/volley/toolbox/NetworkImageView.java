@@ -177,7 +177,7 @@ public class NetworkImageView extends ImageView {
                             setImageResource(mDefaultImageId);
                         }
                     }
-                }, maxWidth, maxHeight);
+                }, width, height, getBitmapPostProcessingTask());
 
         // update the ImageContainer to be the new bitmap container.
         mImageContainer = newContainer;
@@ -215,5 +215,9 @@ public class NetworkImageView extends ImageView {
     protected void drawableStateChanged() {
         super.drawableStateChanged();
         invalidate();
+    }
+
+    public BitmapPostProcessingTask getBitmapPostProcessingTask(){
+        return null;
     }
 }
