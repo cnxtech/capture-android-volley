@@ -1,7 +1,7 @@
 def versionMajor = 0
 def versionMinor = 0
 def versionPatch = 3
-def versionBuild = 0 // bump for dogfood builds, public betas, etc.
+def versionBuild = 1 // bump for dogfood builds, public betas, etc.
 ext.gitHash = "git rev-parse --short=10 HEAD".execute().text.trim()
 ext.versionCodeGlobal = versionMajor * 10000 + versionMinor * 1000 + versionPatch * 100 + versionBuild
 ext.versionNameGlobal = "${versionMajor}.${versionMinor}.${versionPatch}"
