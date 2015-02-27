@@ -213,6 +213,21 @@ public class RequestQueue {
     }
 
     /**
+     * Cancels all requests in this queue with the given tag using tag.equals(request.getTag())
+     */
+    public void cancelAllByTag(final Object tag) {
+        if (tag == null) {
+            throw new IllegalArgumentException("Cannot cancelAll with a null tag");
+        }
+        cancelAll(new RequestFilter() {
+            @Override
+            public boolean apply(Request<?> request) {
+                return tag.equals(request.getTag());
+            }
+        });
+    }
+
+    /**
      * Adds a Request to the dispatch queue.
      * @param request The request to service
      * @return The passed-in request
@@ -221,7 +236,11 @@ public class RequestQueue {
         // Tag the request as belonging to this queue and add it to the set of current requests.
         request.setRequestQueue(this);
         synchronized (mCurrentRequests) {
-            mCurrentRequests.add(request);
+           if (!mCurrentRequests.add(request)){
+               if (VolleyLog.DEBUG) {
+                   VolleyLog.e("Request already in mCurrentRequests, IGNORING, mCurrentRequests size: " + mCurrentRequests.size() + " " + request);
+               }
+           }
         }
 
         // Process requests in the order they are added.
