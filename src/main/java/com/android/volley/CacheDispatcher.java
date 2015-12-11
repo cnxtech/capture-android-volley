@@ -73,8 +73,8 @@ public class CacheDispatcher extends Thread {
      * @param delivery     Delivery interface to use for posting responses
      */
     public CacheDispatcher(
-            BlockingQueue<Request<?>> cacheQueue, BlockingQueue<Request<?>> networkQueue,
-            Cache cache, DiskCache diskBitmapCache, ResponseDelivery delivery) {
+        BlockingQueue<Request<?>> cacheQueue, BlockingQueue<Request<?>> networkQueue,
+        Cache cache, DiskCache diskBitmapCache, ResponseDelivery delivery) {
         mCacheQueue = cacheQueue;
         mNetworkQueue = networkQueue;
         mCache = cache;
@@ -114,9 +114,8 @@ public class CacheDispatcher extends Thread {
                     continue;
                 }
 
-                 /** special handling for an ImageRequest */
+                /** special handling for an ImageRequest */
                 if (request instanceof ImageRequest) {
-                    android.util.Log.i("####", TAG + " got ImageRequest " + request.getUrl());   //TODO remove when testing is done
                     //check image cache, return result if we have key there
                     byte[] bytes = diskBitmapCache.getBytes(request.getUrl());
 

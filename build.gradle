@@ -44,6 +44,10 @@ android {
     compileSdkVersion 21
     buildToolsVersion "21.1.2"
 
+
+    defaultConfig {
+        minSdkVersion 19
+    }
     android.libraryVariants.all { variant ->
         def name = variant.buildType.name
         if (name.equals(com.android.builder.core.BuilderConstants.DEBUG)) {

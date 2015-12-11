@@ -16,7 +16,7 @@ public class FileUtils {
     public static String getMimeTypeForFilePath(String filePath) {
         String type = "";
         String extension = MimeTypeMap.getFileExtensionFromUrl(filePath);
-        if (extension != null) {
+        if (extension != null && !extension.isEmpty()) {
             MimeTypeMap mime = MimeTypeMap.getSingleton();
             type = mime.getMimeTypeFromExtension(extension);
         }
