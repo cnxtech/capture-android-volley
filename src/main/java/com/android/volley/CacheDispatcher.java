@@ -126,7 +126,7 @@ public class CacheDispatcher extends Thread {
                     }
 
                     if (bytes == null || bytes.length == 0) {   //if we didn't get anything from cache
-                        if (request.getUrl().startsWith("file")) {  //let's check, may be this is local file
+                        if (request.getUrl().startsWith("file") || request.getUrl().startsWith("/storage") || request.getUrl().startsWith("/sdcard")) {  //let's check, may be this is local file
 
                             Response<?> response = ((ImageRequest) request).handleLocalUri();
                             mDelivery.postResponse(request, response);
