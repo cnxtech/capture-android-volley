@@ -45,7 +45,7 @@ public class FileUtils {
 
 
     public static String getFilePath(String uri) {
-        String filePath = "";
+        String filePath = uri;
         if (uri.startsWith("file")) {
             filePath = Uri.parse(uri).getPath();
         }
